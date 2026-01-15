@@ -428,7 +428,7 @@ class BrowserFingerprint {
   async send(data) {
     console.log("[FP] sending fingerprint");
     try {
-      const response = await fetch('/api/fingerprint', {
+      const response = await fetch('/collect', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
