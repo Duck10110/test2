@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  db:
+    image: mariadb:10.3
+    container_name: moodle_db
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: moodle
+      MYSQL_USER: moodle
+      MYSQL_PASSWORD: moodlepassword
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: unless-stopped
+
+  moodle:
+    image: php:7.2-apache
+    container_name: moodle_eguru_35
+    depends_on:
+      - db
+    ports:
+      - "8080:80"
+    environment:
+      MOODLE_DB_HOST: db
+      MOODLE_DB_NAME: moodle
+      MOODLE_DB_USER: moodle
+      MOODLE_DB_PASS: moodlepassword
+    volumes:
+      - moodle_data:/var/www/html
+      - moodledata:/var/www/moodledata
+    restart: unless-stopped
+
+    command: >
+      sh -c "
+        apt-get update && 
+        apt-get install -y libpng-dev libjpeg-dev libxml2-dev libzip-dev libicu-dev libldap-dev libxslt-dev unzip git && 
+        docker-php-ext-configure gd --with-jpeg-dir=/usr/include/ && 
+        docker-php-ext-install gd mysqli pdo_mysql xml zip intl soap opcache ldap xsl && 
+        a2enmod rewrite expires headers &&
+
+        echo 'memory_limit=512M' > /usr/local/etc/php/conf.d/moodle.ini &&
+        echo 'upload_max_filesize=128M' >> /usr/local/etc/php/conf.d/moodle.ini &&
+        echo 'post_max_size=128M' >> /usr/local/etc/php/conf.d/moodle.ini &&
+        echo 'max_execution_time=300' >> /usr/local/etc/php/conf.d/moodle.ini &&
+
+        if [ ! -f /var/www/html/version.php ]; then
+          echo '=== Tải Moodle 3.5.3 ===' &&
+          curl -L https://download.moodle.org/download.php/stable35/moodle-3.5.3.zip -o /tmp/moodle.zip &&
+          unzip /tmp/moodle.zip -d /tmp &&
+          cp -R /tmp/moodle/* /var/www/html/ &&
+          rm -rf /tmp/moodle /tmp/moodle.zip &&
+          chown -R www-data:www-data /var/www/html;
+        fi &&
+
+        apache2-foreground
+      "
+
+volumes:
+  mysql_data:
+  moodle_data:
+  moodledata:
